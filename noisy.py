@@ -1,4 +1,8 @@
+import functools
+
+import numpy as np
 import torch
+import torchvision
 import torchvision.models as models
 import torchvision.transforms as transforms
 from PIL import Image
@@ -6,99 +10,120 @@ from sklearn.model_selection import train_test_split
 import idx2numpy
 import gzip
 import torch
+from torchvision import datasets
 from torchvision.datasets import MNIST
+import torch.optim as optim
 from torchvision.transforms import transforms
 from torch.utils.data import DataLoader, random_split, Dataset
 import torchvision.models as models
-raw_dataset = MNIST('path_to_data_folder', train=True, download=True, transform=transforms.ToTensor())
-noise_std = 0.1
+from sklearn.datasets import load_digits
+import matplotlib.pyplot as plt
+
+torch.manual_seed(42)
+
+def marginal_prob(x, t, eps):
+    beta_0=0.1
+    beta_1=20
+    log_mean_coeff = (
+            -0.25 * (t ** 2 - eps ** 2) * (beta_1 - beta_0)
+            - 0.5 * (t - eps) * beta_0)
+    log_mean_coeff = torch.tensor(log_mean_coeff)  # Convert to a tensor
+    std = torch.sqrt(1. - torch.exp(2. * log_mean_coeff))
+    return std
+# Add Gaussian noise to the dataset
 
 
-class NoisedMNISTDataset(Dataset):
-    def __init__(self, raw_dataset, noise_std):
-        self.raw_dataset = raw_dataset
-        self.noise_std = noise_std
 
-    def __len__(self):
-        return len(self.raw_dataset)
+transform = transforms.Compose([
+    transforms.ToTensor(),
+    transforms.Lambda(lambda x: x + std_dev * torch.randn_like(x)),
+    transforms.Lambda(lambda x: x.repeat(3, 1, 1) if x.size(0) == 1 else x),
+    transforms.Normalize((0.1307,), (0.3081,))
+])
+mnist_dataset = MNIST(root='data/', train=True, transform=transform, download=True)
 
-    def __getitem__(self, idx):
-        image, label = self.raw_dataset[idx]
+tval = 0.08
+std_dev = marginal_prob(mnist_dataset, tval, 0.06)
 
-        # Add noise to the image
-        noised_image = image + torch.randn_like(image) * self.noise_std
+# Plot some images from the noisy dataset
+num_images = 5
 
-        return noised_image, label, image
+# Get random samples from the noisy dataset
 
-noised_dataset = NoisedMNISTDataset(raw_dataset, noise_std)
+sample_indices = torch.randperm(len(mnist_dataset))[:num_images]
+samples = [mnist_dataset[i][0] for i in sample_indices]
 
-train_noise_size = int(0.8 * len(noised_dataset))
-test_noise_size = len(noised_dataset) - train_noise_size
-train_noise_dataset, test_noise_dataset = random_split(noised_dataset, [train_noise_size, test_noise_size])
+# Create a grid of images
+grid = torchvision.utils.make_grid(samples, nrow=num_images)
 
+# Convert the grid tensor to a numpy array and transpose the dimensions
+grid_np = grid.numpy().transpose((1, 2, 0))
+
+# Plot the grid of images
+plt.imshow(grid_np)
+plt.axis('off')
+plt.show()
+
+
+
+train_size = int(0.8 * len(mnist_dataset))
+test_size = len(mnist_dataset) - train_size
+train_dataset, test_dataset = torch.utils.data.random_split(mnist_dataset, [train_size, test_size])
+
+# Create data loaders
 batch_size = 64
-train_loader = DataLoader(train_noise_size, batch_size=batch_size, shuffle=True)
-test_loader = DataLoader(test_noise_size, batch_size=batch_size, shuffle=False)
 
-resnet = models.resnet50(pretrained=False)
+train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+
+
+resnet = models.resnet34(pretrained=False)
 
 
 # Training loop
 num_epochs = 10  # Adjust the number of epochs as needed
 criterion = torch.nn.CrossEntropyLoss()
-optimizer = torch.optim.SGD(resnet.parameters(), lr=0.01)
+optimizer = optim.Adam(resnet.parameters(), lr=0.001)
+
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+resnet.to(device)
 
 for epoch in range(num_epochs):
-    # Training steps
-    resnet.train()
-    for images, labels, _ in train_loader:
+    running_loss = 0.0
+    correct = 0
+    total = 0
+
+    for images, labels in train_loader:
+        images, labels = images.to(device), labels.to(device)
         optimizer.zero_grad()
+
         outputs = resnet(images)
         loss = criterion(outputs, labels)
+        optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
-    # Evaluation steps
-    resnet.eval()
-    total_correct = 0
-    total_samples = 0
-    with torch.no_grad():
-        for images, labels, _ in test_loader:
-            outputs = resnet(images)
-            _, predicted = torch.max(outputs.data, 1)
-            total_samples += labels.size(0)
-            total_correct += (predicted == labels).sum().item()
+        running_loss += loss.item()
+        _, predicted = torch.max(outputs.data, 1)
+        total += labels.size(0)
+        correct += (predicted == labels).sum().item()
 
-    accuracy = 100 * total_correct / total_samples
-    print(f'Epoch [{epoch+1}/{num_epochs}], Test Accuracy: {accuracy:.2f}%')
+    epoch_loss = running_loss / len(train_loader)
+    epoch_acc = correct / total
 
+    print(f'Epoch {epoch+1}/{num_epochs}, Loss: {epoch_loss:.4f}, Accuracy: {epoch_acc:.4f}')
 
-# Specify the path to your dataset files
-train_images_file = 'path/to/dataset1_train_images.idx3-ubyte'
-train_labels_file = 'path/to/dataset1_train_labels.idx3-ubyte'
-test_images_file = 'path/to/dataset1_test_images.idx3-ubyte'
-test_labels_file = 'path/to/dataset1_test_labels.idx3-ubyte'
+# Evaluation on the test set
+resnet.eval()
+total_correct = 0
+total_samples = 0
+with torch.no_grad():
+    for images, labels in test_loader:
+        images, labels = images.to(device), labels.to(device)
+        outputs = resnet(images)
+        _, predicted = torch.max(outputs.data, 1)
+        total_samples += labels.size(0)
+        total_correct += (predicted == labels).sum().item()
 
-# Load training images
-with gzip.open(train_images_file, 'rb') as f:
-    train_images = idx2numpy.convert_from_file(f)
-
-# Load training labels
-with gzip.open(train_labels_file, 'rb') as f:
-    train_labels = idx2numpy.convert_from_file(f)
-
-# Load test images
-with gzip.open(test_images_file, 'rb') as f:
-    test_images = idx2numpy.convert_from_file(f)
-
-# Load test labels
-with gzip.open(test_labels_file, 'rb') as f:
-    test_labels = idx2numpy.convert_from_file(f)
-# Split dataset1
-dataset1_train, dataset1_test = train_test_split(dataset1, test_size=0.2, random_state=42)
-
-# Split dataset2
-dataset2_train, dataset2_test = train_test_split(dataset2, test_size=0.2, random_state=42)
-
-# Split dataset3
-dataset3_train, dataset3_test = train_test_split(dataset3, test_size=0.2, random_state=42)
+accuracy = 100 * total_correct / total_samples
+print(f'Test Accuracy: {accuracy:.2f}%')

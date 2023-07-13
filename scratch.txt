@@ -1,0 +1,41 @@
+raw.py
+
+Epoch 1/10, Loss: 0.1777, Accuracy: 0.9469
+Epoch 2/10, Loss: 0.0712, Accuracy: 0.9788
+Epoch 3/10, Loss: 0.0509, Accuracy: 0.9852
+Epoch 4/10, Loss: 0.0448, Accuracy: 0.9871
+Epoch 5/10, Loss: 0.0422, Accuracy: 0.9876
+Epoch 6/10, Loss: 0.0353, Accuracy: 0.9899
+Epoch 7/10, Loss: 0.0364, Accuracy: 0.9894
+Epoch 8/10, Loss: 0.0311, Accuracy: 0.9909
+Epoch 9/10, Loss: 0.0277, Accuracy: 0.9922
+Epoch 10/10, Loss: 0.0222, Accuracy: 0.9938
+Test Accuracy: 99.38%
+
+
+noisy.py
+t=0.06
+Epoch 1/10, Loss: 0.2261, Accuracy: 0.9363
+Epoch 2/10, Loss: 0.0930, Accuracy: 0.9731
+Epoch 3/10, Loss: 0.0722, Accuracy: 0.9786
+Epoch 4/10, Loss: 0.0582, Accuracy: 0.9832
+Epoch 5/10, Loss: 0.0546, Accuracy: 0.9837
+Epoch 6/10, Loss: 0.0507, Accuracy: 0.9861
+Epoch 7/10, Loss: 0.0484, Accuracy: 0.9855
+Epoch 8/10, Loss: 0.0379, Accuracy: 0.9883
+Epoch 9/10, Loss: 0.0421, Accuracy: 0.9881
+Epoch 10/10, Loss: 0.0353, Accuracy: 0.9890
+Test Accuracy: 97.23%
+
+t=0.08
+Epoch 1/10, Loss: 0.2481, Accuracy: 0.9288
+Epoch 2/10, Loss: 0.1009, Accuracy: 0.9700
+Epoch 3/10, Loss: 0.0795, Accuracy: 0.9770
+Epoch 4/10, Loss: 0.0678, Accuracy: 0.9793
+Epoch 5/10, Loss: 0.0593, Accuracy: 0.9822
+Epoch 6/10, Loss: 0.0589, Accuracy: 0.9836
+Epoch 7/10, Loss: 0.0566, Accuracy: 0.9834
+Epoch 8/10, Loss: 0.0507, Accuracy: 0.9838
+Epoch 9/10, Loss: 0.0456, Accuracy: 0.9863
+Epoch 10/10, Loss: 0.0392, Accuracy: 0.9878
+Test Accuracy: 98.69%
